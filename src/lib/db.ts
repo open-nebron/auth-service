@@ -26,7 +26,7 @@ export interface SessionDocument {
 export class Database {
   private client: MongoClient;
   private db: Db | null = null;
-  private readonly dbName = 'zenuxs_auth';
+  private readonly dbName = 'nebron_auth';
 
   constructor(mongoUrl: string) {
     this.client = new MongoClient(mongoUrl);

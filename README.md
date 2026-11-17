@@ -31,7 +31,7 @@ JWKS (RS256)           JWKS (RS256)           JWKS (RS256)
               - auth.session.revoked
 ```
 
-- **Database Ownership**: Owns the `zenuxs_auth` database in MongoDB. No other service reads or writes to this database directly.
+- **Database Ownership**: Owns the `nebron_auth` database in MongoDB. No other service reads or writes to this database directly.
 - **Sole Token Issuer**: Asymmetrically issues RS256 JWT access tokens.
 - **Token Verification**: Sibling services verify access tokens via `GET /.well-known/jwks.json`. Sibling services never call `auth-service` synchronously for verification.
 - **Decoupled Asynchronous Events**: Publishes lifecycle events (`auth.user.registered`, `auth.session.revoked`) to Redis Streams (`zenuxs.events`).
@@ -54,7 +54,7 @@ JWKS (RS256)           JWKS (RS256)           JWKS (RS256)
 
 ---
 
-## Data Model (MongoDB, db: `zenuxs_auth`)
+## Data Model (MongoDB, db: `nebron_auth`)
 
 ### Collection: `users`
 ```typescript
@@ -162,7 +162,7 @@ All settings are configured via environment variables and validated at startup u
 | `PORT` | number | `4001` | HTTP port to listen on |
 | `NODE_ENV` | string | `development` | Environment (`development`, `production`, `test`) |
 | `LOG_LEVEL` | string | `info` | Pino logging level (`trace`, `debug`, `info`, `warn`, `error`) |
-| `MONGO_URL` | string | `mongodb://mongo:27017/zenuxs_auth` | MongoDB connection URI |
+| `MONGO_URL` | string | `mongodb://mongo:27017/nebron_auth` | MongoDB connection URI |
 | `REDIS_URL` | string | `redis://redis:6379` | Redis connection URI |
 | `JWT_PRIVATE_KEY_PATH` | string | `./secrets/jwt_private.pem` | Path to RSA private key (PEM PKCS#8) |
 | `JWT_PUBLIC_KEY_PATH` | string | `./secrets/jwt_public.pem` | Path to RSA public key (PEM SPKI) |
