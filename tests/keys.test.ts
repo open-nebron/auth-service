@@ -13,7 +13,7 @@ describe('KeyManager Tests', () => {
   let extraKeysDir: string;
 
   beforeEach(() => {
-    tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'zenuxs-key-test-'));
+    tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'nebron-key-test-'));
     privPath = path.join(tempDir, 'jwt_private.pem');
     pubPath = path.join(tempDir, 'jwt_public.pem');
     extraKeysDir = path.join(tempDir, 'keys');
@@ -96,11 +96,11 @@ describe('KeyManager Tests', () => {
     const oldPrivKey = await jose.importPKCS8(oldKeypair.privateKey, 'RS256');
     const oldToken = await new jose.SignJWT({
       sub: 'user-rotated',
-      email: 'user@zenuxs.com',
+      email: 'user@nebron.com',
       sid: 'sess-rotated',
     })
       .setProtectedHeader({ alg: 'RS256', kid: 'old-key-1' })
-      .setIssuer('zenuxs-auth')
+      .setIssuer('nebron-auth')
       .setAudience(['core', 'chat', 'voice'])
       .setIssuedAt()
       .setExpirationTime('15m')
@@ -109,6 +109,6 @@ describe('KeyManager Tests', () => {
     // KeyManager should verify this token because the old public key is in the JWKS!
     const verified = await km.verifyAccessToken(oldToken);
     expect(verified.sub).toBe('user-rotated');
-    expect(verified.email).toBe('user@zenuxs.com');
+    expect(verified.email).toBe('user@nebron.com');
   });
 });

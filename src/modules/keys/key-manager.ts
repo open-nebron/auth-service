@@ -163,7 +163,7 @@ export class KeyManager {
       sid: claims.sessionId,
     })
       .setProtectedHeader({ alg: 'RS256', kid: this.activeKid })
-      .setIssuer('zenuxs-auth')
+      .setIssuer('nebron-auth')
       .setAudience(['core', 'chat', 'voice'])
       .setIssuedAt()
       .setExpirationTime(`${expiresInSeconds}s`)
@@ -173,7 +173,7 @@ export class KeyManager {
   async verifyAccessToken(token: string): Promise<AccessTokenPayload> {
     try {
       const { payload } = await jose.jwtVerify(token, this.localKeySet, {
-        issuer: 'zenuxs-auth',
+        issuer: 'nebron-auth',
         algorithms: ['RS256'],
       });
 

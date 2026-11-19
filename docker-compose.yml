@@ -3,7 +3,7 @@ version: '3.8'
 services:
   mongo:
     image: mongo:7.0
-    container_name: zenuxs-auth-mongo
+    container_name: nebron-auth-mongo
     ports:
       - "27017:27017"
     environment:
@@ -18,11 +18,11 @@ services:
       start_period: 5s
     restart: unless-stopped
     networks:
-      - zenuxs-auth-net
+      - nebron-auth-net
 
   redis:
     image: redis:7-alpine
-    container_name: zenuxs-auth-redis
+    container_name: nebron-auth-redis
     ports:
       - "6379:6379"
     volumes:
@@ -35,13 +35,13 @@ services:
       start_period: 3s
     restart: unless-stopped
     networks:
-      - zenuxs-auth-net
+      - nebron-auth-net
 
   auth-service:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: zenuxs-auth-service
+    container_name: nebron-auth-service
     ports:
       - "4001:4001"
     environment:
@@ -71,12 +71,12 @@ services:
       start_period: 5s
     restart: unless-stopped
     networks:
-      - zenuxs-auth-net
+      - nebron-auth-net
 
 volumes:
   mongo_data:
   redis_data:
 
 networks:
-  zenuxs-auth-net:
+  nebron-auth-net:
     driver: bridge

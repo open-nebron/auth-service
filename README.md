@@ -1,6 +1,6 @@
 # auth-service
 
-Production-grade authentication microservice for the **Zenuxs** polyrepo ecosystem.
+Production-grade authentication microservice for the **Nebron** polyrepo ecosystem.
 
 `auth-service` serves as the **sole token issuer** in the ecosystem. All other services (`core-api`, `chat-service`, `voice-service`) verify access tokens independently via asymmetric cryptography using this service's JSON Web Key Set (JWKS).
 
@@ -26,7 +26,7 @@ JWKS (RS256)           JWKS (RS256)           JWKS (RS256)
        |                      |                      |
        +----------------------+----------------------+
                               |
-              Async Events: Redis Stream (`zenuxs.events`)
+              Async Events: Redis Stream (`nebron.events`)
               - auth.user.registered
               - auth.session.revoked
 ```
@@ -34,7 +34,7 @@ JWKS (RS256)           JWKS (RS256)           JWKS (RS256)
 - **Database Ownership**: Owns the `nebron_auth` database in MongoDB. No other service reads or writes to this database directly.
 - **Sole Token Issuer**: Asymmetrically issues RS256 JWT access tokens.
 - **Token Verification**: Sibling services verify access tokens via `GET /.well-known/jwks.json`. Sibling services never call `auth-service` synchronously for verification.
-- **Decoupled Asynchronous Events**: Publishes lifecycle events (`auth.user.registered`, `auth.session.revoked`) to Redis Streams (`zenuxs.events`).
+- **Decoupled Asynchronous Events**: Publishes lifecycle events (`auth.user.registered`, `auth.session.revoked`) to Redis Streams (`nebron.events`).
 - **No Synchronous Coupling**: Does not proxy other services or synchronously call `core-api`.
 
 ---
@@ -123,7 +123,7 @@ interface SessionDocument {
 
 ## Asynchronous Events (Redis Streams)
 
-Stream Key: `zenuxs.events`
+Stream Key: `nebron.events`
 
 ### 1. `auth.user.registered`
 Published upon successful user registration.
@@ -132,7 +132,7 @@ Published upon successful user registration.
   "type": "auth.user.registered",
   "payload": {
     "userId": "67389a0123456789abcdef01",
-    "email": "user@zenuxs.com",
+    "email": "user@nebron.com",
     "createdAt": "2026-11-16T18:00:00.000Z"
   }
 }
@@ -240,7 +240,7 @@ Registers a new user account. No tokens are issued at registration.
 curl -i -X POST http://localhost:4001/auth/register \
   -H "Content-Type: application/json" \
   -d '{
-    "email": "developer@zenuxs.com",
+    "email": "developer@nebron.com",
     "password": "SuperSecretPassword123!"
   }'
 ```
@@ -260,7 +260,7 @@ Authenticates credentials, creates a session, and issues tokens.
 curl -i -X POST http://localhost:4001/auth/login \
   -H "Content-Type: application/json" \
   -d '{
-    "email": "developer@zenuxs.com",
+    "email": "developer@nebron.com",
     "password": "SuperSecretPassword123!"
   }'
 ```
@@ -286,7 +286,7 @@ curl -i http://localhost:4001/auth/me \
 ```json
 {
   "userId": "67389a0123456789abcdef01",
-  "email": "developer@zenuxs.com",
+  "email": "developer@nebron.com",
   "sessionId": "67389a0123456789abcdef02"
 }
 ```
@@ -374,7 +374,7 @@ const JWKS = jose.createRemoteJWKSet(
 
 export async function verifyToken(jwt: string) {
   const { payload } = await jose.jwtVerify(jwt, JWKS, {
-    issuer: 'zenuxs-auth',
+    issuer: 'nebron-auth',
     audience: 'core', // 'chat' or 'voice'
     algorithms: ['RS256'],
   });

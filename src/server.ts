@@ -64,7 +64,7 @@ async function startServer(): Promise<void> {
       port: config.PORT,
       host: '0.0.0.0',
     });
-    app.log.info(`Zenuxs Auth Service running at ${address}`);
+    app.log.info(`Nebron Auth Service running at ${address}`);
     app.log.info(`OpenAPI docs available at ${address}/docs`);
   } catch (err) {
     app.log.error({ err }, 'Failed to start server');

@@ -19,7 +19,7 @@ export interface EventPublisher {
 
 export class RedisStreamsEventPublisher implements EventPublisher {
   private redis: Redis;
-  private readonly streamKey = 'zenuxs.events';
+  private readonly streamKey = 'nebron.events';
 
   constructor(redis: Redis) {
     this.redis = redis;

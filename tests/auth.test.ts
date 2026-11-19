@@ -59,7 +59,7 @@ describe('Auth Service Integration Tests', () => {
       expect(user?.passwordHash).toMatch(/^\$argon2id\$/);
 
       // Verify event in Redis stream
-      const events = await ctx.redis.xrange('zenuxs.events', '-', '+');
+      const events = await ctx.redis.xrange('nebron.events', '-', '+');
       expect(events.length).toBe(1);
       const [, fields] = events[0] as [string, string[]];
       expect(fields[0]).toBe('type');
@@ -433,7 +433,7 @@ describe('Auth Service Integration Tests', () => {
       expect(activeSessions.length).toBe(0);
 
       // 4. Verify that auth.session.revoked event was published
-      const events = await ctx.redis.xrange('zenuxs.events', '-', '+');
+      const events = await ctx.redis.xrange('nebron.events', '-', '+');
       const revokedEvent = events.find(([, fields]) => {
         return (fields as string[])[1] === 'auth.session.revoked';
       });
@@ -517,7 +517,7 @@ describe('Auth Service Integration Tests', () => {
       expect(session?.revokedAt).not.toBeNull();
 
       // Verify event was published
-      const events = await ctx.redis.xrange('zenuxs.events', '-', '+');
+      const events = await ctx.redis.xrange('nebron.events', '-', '+');
       const logoutEvent = events.find(([, fields]) => (fields as string[])[1] === 'auth.session.revoked');
       expect(logoutEvent).toBeDefined();
       const payload = JSON.parse((logoutEvent![1] as string[])[3]!);
@@ -582,12 +582,12 @@ describe('Auth Service Integration Tests', () => {
       // Verify that jose can verify the token using this JWKS
       const localJwks = jose.createLocalJWKSet(jwks);
       const verified = await jose.jwtVerify(accessToken, localJwks, {
-        issuer: 'zenuxs-auth',
+        issuer: 'nebron-auth',
         audience: 'core',
       });
 
       expect(verified.payload.email).toBe('jwkuser@example.com');
-      expect(verified.payload.iss).toBe('zenuxs-auth');
+      expect(verified.payload.iss).toBe('nebron-auth');
       expect(verified.payload.aud).toEqual(['core', 'chat', 'voice']);
     });
   });

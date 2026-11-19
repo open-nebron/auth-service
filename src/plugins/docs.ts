@@ -9,7 +9,7 @@ export async function registerDocs(app: FastifyInstance, openApiPath?: string): 
   const filePath = openApiPath || path.resolve(process.cwd(), 'openapi.yaml');
   let openApiSpec: Record<string, unknown> = {
     openapi: '3.1.0',
-    info: { title: 'Zenuxs Auth Service', version: '1.0.0' },
+    info: { title: 'Nebron Auth Service', version: '1.0.0' },
   };
 
   if (fs.existsSync(filePath)) {

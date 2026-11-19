@@ -1,7 +1,7 @@
 {
   "name": "auth-service",
   "version": "1.0.0",
-  "description": "Production-grade authentication microservice for Zenuxs polyrepo",
+  "description": "Production-grade authentication microservice for Nebron polyrepo",
   "type": "module",
   "main": "dist/server.js",
   "scripts": {

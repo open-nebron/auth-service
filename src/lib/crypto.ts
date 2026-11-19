@@ -27,7 +27,7 @@ export async function verifyPassword(hash: string, plain: string): Promise<boole
 
 export async function getDummyPasswordHash(): Promise<string> {
   if (!dummyPasswordHash) {
-    dummyPasswordHash = await argon2.hash('zenuxs-dummy-password-for-timing-enumeration-protection', {
+    dummyPasswordHash = await argon2.hash('nebron-dummy-password-for-timing-enumeration-protection', {
       type: argon2.argon2id,
     });
   }

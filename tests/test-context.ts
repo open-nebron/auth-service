@@ -29,7 +29,7 @@ export async function createTestContext(): Promise<TestContext> {
   const redis = new RedisMock() as unknown as Redis;
   const redisManager = new RedisClientManager(redis);
 
-  const tempSecretsDir = fs.mkdtempSync(path.join(os.tmpdir(), 'zenuxs-auth-keys-'));
+  const tempSecretsDir = fs.mkdtempSync(path.join(os.tmpdir(), 'nebron-auth-keys-'));
   const privKeyPath = path.join(tempSecretsDir, 'jwt_private.pem');
   const pubKeyPath = path.join(tempSecretsDir, 'jwt_public.pem');
 
