@@ -25,7 +25,7 @@ const envSchema = z.object({
     return undefined;
   }, z.boolean().optional()),
   COOKIE_SAME_SITE: z.enum(['lax', 'strict', 'none']).default('lax'),
-  COOKIE_PATH: z.string().default('/auth'),
+  COOKIE_PATH: z.string().default('/'),
 });
 
 export type Config = z.infer<typeof envSchema> & {

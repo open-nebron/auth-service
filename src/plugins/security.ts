@@ -41,6 +41,7 @@ export async function registerSecurityPlugins(
     global: false, // Per-route rate limiting
     redis: redisClient,
     errorResponseBuilder: () => ({
+      statusCode: 429,
       error: {
         code: 'RATE_LIMIT_EXCEEDED',
         message: 'Too many requests, please try again later',
