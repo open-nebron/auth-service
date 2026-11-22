@@ -15,9 +15,22 @@ const envSchema = z.object({
   ALLOWED_ORIGINS: z.string().default('http://localhost:3000,http://localhost:8081'),
   NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
   LOG_LEVEL: z.string().default('info'),
+  COOKIE_DOMAIN: z.string().optional(),
+  COOKIE_SECURE: z.preprocess((val) => {
+    if (typeof val === 'boolean') return val;
+    if (typeof val === 'string') {
+      if (val.toLowerCase() === 'true') return true;
+      if (val.toLowerCase() === 'false') return false;
+    }
+    return undefined;
+  }, z.boolean().optional()),
+  COOKIE_SAME_SITE: z.enum(['lax', 'strict', 'none']).default('lax'),
+  COOKIE_PATH: z.string().default('/auth'),
 });
 
-export type Config = z.infer<typeof envSchema>;
+export type Config = z.infer<typeof envSchema> & {
+  COOKIE_SECURE: boolean;
+};
 
 export function loadConfig(overrides?: Partial<Record<string, unknown>>): Config {
   const envData = { ...process.env, ...overrides };
@@ -28,5 +41,9 @@ export function loadConfig(overrides?: Partial<Record<string, unknown>>): Config
       .join(', ');
     throw new Error(`Invalid configuration: ${errorDetails}`);
   }
-  return result.data;
+  const isProduction = result.data.NODE_ENV === 'production';
+  return {
+    ...result.data,
+    COOKIE_SECURE: result.data.COOKIE_SECURE ?? isProduction,
+  };
 }

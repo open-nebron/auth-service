@@ -45,6 +45,10 @@ export async function createTestContext(): Promise<TestContext> {
     ALLOWED_ORIGINS: 'http://localhost:3000,http://localhost:8081',
     NODE_ENV: 'test',
     LOG_LEVEL: 'silent',
+    COOKIE_DOMAIN: undefined,
+    COOKIE_SECURE: false,
+    COOKIE_SAME_SITE: 'lax',
+    COOKIE_PATH: '/auth',
   };
 
   const db = new Database(mongoUri);

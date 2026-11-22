@@ -1,4 +1,5 @@
 import fastify, { FastifyInstance } from 'fastify';
+import fastifyCookie from '@fastify/cookie';
 import { Config } from './lib/config.js';
 import { Database } from './lib/db.js';
 import { RedisClientManager } from './lib/redis.js';
@@ -50,6 +51,9 @@ export async function buildApp(deps: AppDependencies): Promise<FastifyInstance> 
   // Global Error Handler & 404
   registerErrorHandler(app);
 
+  // Cookie Support
+  await app.register(fastifyCookie);
+
   // Security Plugins (Helmet, CORS, Rate Limit)
   await registerSecurityPlugins(app, config, redisClient);
 
@@ -72,6 +76,7 @@ export async function buildApp(deps: AppDependencies): Promise<FastifyInstance> 
     db,
     redisManager,
     redisClient,
+    config,
   });
 
   return app;

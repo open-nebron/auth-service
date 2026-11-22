@@ -4,6 +4,7 @@ import { AuthService } from './service.js';
 import { KeyManager } from '../keys/key-manager.js';
 import { Database } from '../../lib/db.js';
 import { RedisClientManager } from '../../lib/redis.js';
+import { Config } from '../../lib/config.js';
 import { createEmailRateLimiter } from '../../plugins/security.js';
 import {
   registerSchema,
@@ -11,7 +12,7 @@ import {
   refreshSchema,
   logoutSchema,
 } from './schemas.js';
-import { ValidationError, UnauthorizedError } from '../../lib/errors.js';
+import { ValidationError, UnauthorizedError, MissingRefreshTokenError, TokenRevokedError } from '../../lib/errors.js';
 
 export function registerAuthRoutes(
   app: FastifyInstance,
@@ -21,10 +22,29 @@ export function registerAuthRoutes(
     db: Database;
     redisManager: RedisClientManager;
     redisClient: Redis;
+    config: Config;
   }
 ): void {
-  const { authService, keyManager, db, redisManager, redisClient } = options;
+  const { authService, keyManager, db, redisManager, redisClient, config } = options;
   const emailLimiter = createEmailRateLimiter(redisClient);
+
+  const getCookieOptions = () => ({
+    path: config.COOKIE_PATH,
+    httpOnly: true,
+    secure: config.COOKIE_SECURE,
+    sameSite: config.COOKIE_SAME_SITE,
+    domain: config.COOKIE_DOMAIN,
+    maxAge: config.REFRESH_TOKEN_TTL_DAYS * 86400,
+  });
+
+  const getClearCookieOptions = () => ({
+    path: config.COOKIE_PATH,
+    httpOnly: true,
+    secure: config.COOKIE_SECURE,
+    sameSite: config.COOKIE_SAME_SITE,
+    domain: config.COOKIE_DOMAIN,
+    maxAge: 0,
+  });
 
   // POST /auth/register
   app.post(
@@ -76,6 +96,39 @@ export function registerAuthRoutes(
     }
   );
 
+  // POST /auth/login/cookie
+  app.post(
+    '/auth/login/cookie',
+    {
+      config: {
+        rateLimit: {
+          max: 10,
+          timeWindow: 60 * 1000, // 10 per minute per IP
+        },
+      },
+      preHandler: [emailLimiter],
+    },
+    async (request: FastifyRequest, reply: FastifyReply) => {
+      const parsed = loginSchema.safeParse(request.body);
+      if (!parsed.success) {
+        const msg = parsed.error.issues.map((i) => i.message).join('; ');
+        throw new ValidationError(msg);
+      }
+
+      const userAgent = request.headers['user-agent'] as string | undefined;
+      const ip = request.ip;
+
+      const result = await authService.login(parsed.data, { userAgent, ip });
+
+      reply.setCookie('refresh_token', result.refreshToken, getCookieOptions());
+
+      return reply.status(200).send({
+        accessToken: result.accessToken,
+        expiresIn: result.expiresIn,
+      });
+    }
+  );
+
   // POST /auth/refresh
   app.post(
     '/auth/refresh',
@@ -102,6 +155,44 @@ export function registerAuthRoutes(
     }
   );
 
+  // POST /auth/refresh/cookie
+  app.post(
+    '/auth/refresh/cookie',
+    {
+      config: {
+        rateLimit: {
+          max: 30,
+          timeWindow: 60 * 1000, // 30 per minute per IP
+        },
+      },
+    },
+    async (request: FastifyRequest, reply: FastifyReply) => {
+      const refreshToken = request.cookies?.refresh_token;
+      if (!refreshToken) {
+        throw new MissingRefreshTokenError('Missing refresh token cookie');
+      }
+
+      const userAgent = request.headers['user-agent'] as string | undefined;
+      const ip = request.ip;
+
+      try {
+        const result = await authService.refresh({ refreshToken }, { userAgent, ip });
+
+        reply.setCookie('refresh_token', result.refreshToken, getCookieOptions());
+
+        return reply.status(200).send({
+          accessToken: result.accessToken,
+          expiresIn: result.expiresIn,
+        });
+      } catch (err) {
+        if (err instanceof TokenRevokedError) {
+          reply.clearCookie('refresh_token', getClearCookieOptions());
+        }
+        throw err;
+      }
+    }
+  );
+
   // POST /auth/logout
   app.post(
     '/auth/logout',
@@ -113,6 +204,29 @@ export function registerAuthRoutes(
       }
 
       await authService.logout(parsed.data);
+      return reply.status(204).send();
+    }
+  );
+
+  // POST /auth/logout/cookie
+  app.post(
+    '/auth/logout/cookie',
+    {
+      config: {
+        rateLimit: {
+          max: 30,
+          timeWindow: 60 * 1000, // 30 per minute per IP
+        },
+      },
+    },
+    async (request: FastifyRequest, reply: FastifyReply) => {
+      const refreshToken = request.cookies?.refresh_token;
+      if (refreshToken) {
+        await authService.logout({ refreshToken });
+      }
+
+      reply.clearCookie('refresh_token', getClearCookieOptions());
+
       return reply.status(204).send();
     }
   );

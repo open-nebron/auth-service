@@ -24,24 +24,13 @@ export async function registerSecurityPlugins(
     crossOriginEmbedderPolicy: false,
   });
 
-  // CORS configuration
+  // CORS configuration: explicit allowlist only, credentials enabled
   const allowedOrigins = config.ALLOWED_ORIGINS.split(',')
     .map((origin) => origin.trim())
     .filter(Boolean);
 
   await app.register(fastifyCors, {
-    origin: (origin, callback) => {
-      // Allow requests with no origin (like mobile apps or curl)
-      if (!origin) {
-        callback(null, true);
-        return;
-      }
-      if (allowedOrigins.includes(origin) || allowedOrigins.includes('*')) {
-        callback(null, true);
-        return;
-      }
-      callback(new Error('Not allowed by CORS'), false);
-    },
+    origin: allowedOrigins,
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization'],
@@ -61,7 +50,7 @@ export async function registerSecurityPlugins(
 }
 
 /**
- * PreHandler hook for /auth/login to enforce 5 requests per minute per email.
+ * PreHandler hook for /auth/login and /auth/login/cookie to enforce 5 requests per minute per email.
  */
 export function createEmailRateLimiter(redis: Redis) {
   return async (request: FastifyRequest): Promise<void> => {

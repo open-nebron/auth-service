@@ -45,6 +45,12 @@ export class UnauthorizedError extends AppError {
   }
 }
 
+export class MissingRefreshTokenError extends AppError {
+  constructor(message: string = 'Refresh token is required') {
+    super(401, 'missing_refresh_token', message);
+  }
+}
+
 export class TokenExpiredError extends AppError {
   constructor(message: string = 'Token has expired') {
     super(401, 'TOKEN_EXPIRED', message);
