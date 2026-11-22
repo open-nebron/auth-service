@@ -47,8 +47,8 @@ paths:
 
   /auth/login:
     post:
-      summary: User login
-      description: Authenticates user with email and password. Generates an RS256 JWT access token and an opaque refresh token.
+      summary: User login (Body-based for mobile/native clients)
+      description: Authenticates user with email and password. Generates an RS256 JWT access token and an opaque refresh token in response body.
       tags:
         - Authentication
       requestBody:
@@ -83,9 +83,53 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
 
+  /auth/login/cookie:
+    post:
+      summary: User login (Cookie-based for web clients)
+      description: Authenticates user with email and password. Returns access token in body and sets opaque refresh token in HttpOnly cookie.
+      tags:
+        - Authentication
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        '200':
+          description: Login successful
+          headers:
+            Set-Cookie:
+              description: HttpOnly refresh token cookie
+              schema:
+                type: string
+                example: "refresh_token=...; Path=/auth; HttpOnly; SameSite=Lax; Max-Age=2592000"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CookieTokenResponse'
+        '400':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          description: Rate limit exceeded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
   /auth/refresh:
     post:
-      summary: Refresh access token
+      summary: Refresh access token (Body-based for mobile/native clients)
       description: Rotates refresh token and issues a new access token. If a previously revoked refresh token is presented, the entire session chain is revoked (reuse detection).
       tags:
         - Authentication
@@ -121,9 +165,54 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
 
+  /auth/refresh/cookie:
+    post:
+      summary: Refresh access token (Cookie-based for web clients)
+      description: Rotates refresh token from HttpOnly cookie and issues a new access token in body. Sets a new rotated HttpOnly refresh token cookie.
+      tags:
+        - Authentication
+      parameters:
+        - in: cookie
+          name: refresh_token
+          schema:
+            type: string
+          required: true
+          description: Opaque refresh token cookie
+      responses:
+        '200':
+          description: Token refreshed successfully
+          headers:
+            Set-Cookie:
+              description: Rotated HttpOnly refresh token cookie
+              schema:
+                type: string
+                example: "refresh_token=...; Path=/auth; HttpOnly; SameSite=Lax; Max-Age=2592000"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CookieTokenResponse'
+        '401':
+          description: Missing, expired, or revoked refresh token cookie
+          headers:
+            Set-Cookie:
+              description: Clears cookie if revoked
+              schema:
+                type: string
+                example: "refresh_token=; Max-Age=0; Path=/auth; HttpOnly"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          description: Rate limit exceeded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
   /auth/logout:
     post:
-      summary: Log out user
+      summary: Log out user (Body-based for mobile/native clients)
       description: Revokes the session associated with the provided refresh token. Idempotent (always returns 204).
       tags:
         - Authentication
@@ -136,6 +225,29 @@ paths:
       responses:
         '204':
           description: Successfully logged out
+
+  /auth/logout/cookie:
+    post:
+      summary: Log out user (Cookie-based for web clients)
+      description: Revokes the session associated with the refresh token in cookie and clears the HttpOnly cookie.
+      tags:
+        - Authentication
+      parameters:
+        - in: cookie
+          name: refresh_token
+          schema:
+            type: string
+          required: false
+          description: Opaque refresh token cookie to revoke
+      responses:
+        '204':
+          description: Successfully logged out
+          headers:
+            Set-Cookie:
+              description: Clears refresh token cookie
+              schema:
+                type: string
+                example: "refresh_token=; Max-Age=0; Path=/auth; HttpOnly; SameSite=Lax"
 
   /auth/me:
     get:
@@ -260,6 +372,19 @@ components:
         refreshToken:
           type: string
           example: 3b1a8f94d9302e1c9408b472ea638510cb45762a3928173450912cb849182390
+        expiresIn:
+          type: integer
+          example: 900
+
+    CookieTokenResponse:
+      type: object
+      required:
+        - accessToken
+        - expiresIn
+      properties:
+        accessToken:
+          type: string
+          example: eyJhbGciOiJSUzI1NiIsImtpZCI6ImRldi0xIn0...
         expiresIn:
           type: integer
           example: 900

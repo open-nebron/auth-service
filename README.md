@@ -47,6 +47,7 @@ JWKS (RS256)           JWKS (RS256)           JWKS (RS256)
 - **Cache & Storage**: Redis 7 via `ioredis` (session refresh token hashes, rate limiting, and event stream)
 - **Password Hashing**: Argon2id via `argon2` with constant-time verification & dummy hashing
 - **JWT & Cryptography**: `jose` (RS256 asymmetric signatures, JWKS export and validation)
+- **Cookies**: `@fastify/cookie` (HttpOnly, Secure, SameSite, domain-aware)
 - **Request Validation**: `zod`
 - **Logging**: `pino` with automatic redaction of passwords, tokens, and hashes
 - **Testing**: `vitest` (in-memory MongoDB & Redis for deterministic integration tests)
@@ -108,16 +109,79 @@ interface SessionDocument {
    - On every refresh, the presented token is revoked and a new pair is issued.
    - **Reuse Detection**: If an already-revoked refresh token is presented, the entire session chain is immediately revoked and an `auth.session.revoked` (`reason: "reuse_detected"`) event is published.
 4. **Rate Limiting (backed by Redis)**:
-   - `POST /auth/login`: 10 requests/min per IP **and** 5 requests/min per email (whichever threshold hits first).
+   - `POST /auth/login` and `POST /auth/login/cookie`: 10 requests/min per IP **and** 5 requests/min per email (whichever threshold hits first).
    - `POST /auth/register`: 5 requests/hour per IP.
-   - `POST /auth/refresh`: 30 requests/min per IP.
+   - `POST /auth/refresh` and `POST /auth/refresh/cookie`: 30 requests/min per IP.
+   - `POST /auth/logout/cookie`: 30 requests/min per IP.
 5. **Security Headers & Boundaries**:
    - Helmet headers via `@fastify/helmet`.
-   - Strict CORS origin whitelisting via `@fastify/cors`.
+   - Strict CORS origin whitelisting via `@fastify/cors` with `credentials: true`.
    - Body limit enforced at 16 KB.
    - Proxy trust enabled (`trustProxy: true`) for accurate `X-Forwarded-For` rate limiting.
    - Zero sensitive logging: passwords, tokens, and hashes are redacted from Pino logs.
    - Standardized error format: `{ error: { code, message } }` with no stack traces or PII.
+
+---
+
+## Cookie Authentication (Web Clients)
+
+For browser-based web applications, `auth-service` offers dedicated cookie endpoints (`/cookie`) alongside existing body-based endpoints.
+
+### When to Use `/cookie` vs Body Endpoints
+- **Mobile & Native Clients**: Use body endpoints (`POST /auth/login`, `POST /auth/refresh`, `POST /auth/logout`). Mobile apps store refresh tokens in secure hardware-backed storage (iOS Keychain, Android Keystore) and manage access tokens in memory.
+- **Web Frontend Clients**: Use cookie endpoints (`POST /auth/login/cookie`, `POST /auth/refresh/cookie`, `POST /auth/logout/cookie`). Browsers store the refresh token inside a secure, `HttpOnly` cookie that JavaScript cannot access, preventing token theft via Cross-Site Scripting (XSS). Access tokens are returned in the response body and kept in browser memory only.
+
+### Cookie Configuration & Flags
+- **Name**: `refresh_token`
+- **HttpOnly**: `true` (Inaccessible to `document.cookie`)
+- **Secure**: `true` in production (`false` in development for `http://localhost`)
+- **SameSite**: `Lax` by default (`None` when operating across separate subdomains)
+- **Path**: `/auth` (Restricts cookie transmission to authentication endpoints)
+- **Domain**: Optional domain (e.g. `.nebron.com` for cross-subdomain authentication)
+- **Max-Age**: Equal to `REFRESH_TOKEN_TTL_DAYS * 86400` (30 days)
+
+### CORS Credentials Setup
+The service explicitly allowlists origins from `ALLOWED_ORIGINS` and enables `credentials: true`. Wildcards (`*`) and boolean `true` origins are disbarred.
+
+Preflight verification:
+```bash
+curl -X OPTIONS http://localhost:4001/auth/login/cookie \
+  -H "Origin: http://localhost:3000" \
+  -H "Access-Control-Request-Method: POST" \
+  -H "Access-Control-Request-Headers: content-type" -i
+```
+Expected headers:
+```
+Access-Control-Allow-Origin: http://localhost:3000
+Access-Control-Allow-Credentials: true
+```
+
+### Complete Web Client Flow with Cookie Jar
+
+```bash
+# 1. Login with credentials -> stores refresh_token in cookies.txt
+curl -i -X POST http://localhost:4001/auth/login/cookie \
+  -H "Content-Type: application/json" \
+  -c cookies.txt \
+  -d '{
+    "email": "developer@nebron.com",
+    "password": "SuperSecretPassword123!"
+  }'
+
+# 2. Refresh tokens -> reads refresh_token cookie, updates cookie jar with rotated token
+curl -i -X POST http://localhost:4001/auth/refresh/cookie \
+  -b cookies.txt \
+  -c cookies.txt
+
+# 3. Access protected resource with Bearer token
+curl -i http://localhost:4001/auth/me \
+  -H "Authorization: Bearer <ACCESS_TOKEN>"
+
+# 4. Logout -> revokes session in DB and clears cookie (Max-Age=0)
+curl -i -X POST http://localhost:4001/auth/logout/cookie \
+  -b cookies.txt \
+  -c cookies.txt
+```
 
 ---
 
@@ -170,6 +234,10 @@ All settings are configured via environment variables and validated at startup u
 | `ACCESS_TOKEN_TTL_SECONDS` | number | `900` | Access token lifespan (15 minutes) |
 | `REFRESH_TOKEN_TTL_DAYS` | number | `30` | Refresh token lifespan (30 days) |
 | `ALLOWED_ORIGINS` | string | `http://localhost:3000,http://localhost:8081` | Comma-delimited list of allowed CORS origins |
+| `COOKIE_DOMAIN` | string | `undefined` | Domain attribute for cookies (e.g. `.nebron.com`) |
+| `COOKIE_SECURE` | boolean | `NODE_ENV === "production"` | Require HTTPS for cookies (false in dev for localhost) |
+| `COOKIE_SAME_SITE` | string | `lax` | SameSite cookie policy (`lax`, `strict`, `none`) |
+| `COOKIE_PATH` | string | `/auth` | Path attribute for refresh token cookie |
 
 > [!NOTE]
 > In `development` mode, if RSA keys are missing from `JWT_PRIVATE_KEY_PATH` and `JWT_PUBLIC_KEY_PATH`, a 2048-bit RSA keypair will be automatically generated and persisted to disk. In `production`, the service fails fast if keys are not present. Key rotation is supported by placing older public keys in `./secrets/keys/`.
@@ -253,8 +321,8 @@ curl -i -X POST http://localhost:4001/auth/register \
 
 ---
 
-### 3. Login
-Authenticates credentials, creates a session, and issues tokens.
+### 3. Login (Body-based for Mobile/Native)
+Authenticates credentials, creates a session, and issues tokens in body.
 
 ```bash
 curl -i -X POST http://localhost:4001/auth/login \
@@ -275,26 +343,33 @@ curl -i -X POST http://localhost:4001/auth/login \
 
 ---
 
-### 4. Get Current User (`/auth/me`)
-Retrieves the authenticated user claims from the RS256 Bearer access token.
+### 4. Login (Cookie-based for Web)
+Authenticates credentials, returns access token in body, and sets HttpOnly refresh token cookie.
 
 ```bash
-curl -i http://localhost:4001/auth/me \
-  -H "Authorization: Bearer <ACCESS_TOKEN>"
+curl -i -X POST http://localhost:4001/auth/login/cookie \
+  -H "Content-Type: application/json" \
+  -c cookies.txt \
+  -d '{
+    "email": "developer@nebron.com",
+    "password": "SuperSecretPassword123!"
+  }'
 ```
 **Response (200 OK):**
+```
+Set-Cookie: refresh_token=3a7b9c1...; Path=/auth; HttpOnly; SameSite=Lax; Max-Age=2592000
+```
 ```json
 {
-  "userId": "67389a0123456789abcdef01",
-  "email": "developer@nebron.com",
-  "sessionId": "67389a0123456789abcdef02"
+  "accessToken": "eyJhbGciOiJSUzI1NiIsImtpZCI6ImRldi0xIn0...",
+  "expiresIn": 900
 }
 ```
 
 ---
 
-### 5. Refresh Access Token
-Rotates the refresh token and issues a new access token.
+### 5. Refresh Access Token (Body-based for Mobile/Native)
+Rotates the refresh token and issues a new access token in body.
 
 ```bash
 curl -i -X POST http://localhost:4001/auth/refresh \
@@ -314,7 +389,28 @@ curl -i -X POST http://localhost:4001/auth/refresh \
 
 ---
 
-### 6. Logout
+### 6. Refresh Access Token (Cookie-based for Web)
+Rotates the refresh token cookie and issues a new access token in body.
+
+```bash
+curl -i -X POST http://localhost:4001/auth/refresh/cookie \
+  -b cookies.txt \
+  -c cookies.txt
+```
+**Response (200 OK):**
+```
+Set-Cookie: refresh_token=8f7e6d5...; Path=/auth; HttpOnly; SameSite=Lax; Max-Age=2592000
+```
+```json
+{
+  "accessToken": "eyJhbGciOiJSUzI1NiIsImtpZCI6ImRldi0xIn0...",
+  "expiresIn": 900
+}
+```
+
+---
+
+### 7. Logout (Body-based for Mobile/Native)
 Revokes the session associated with the provided refresh token.
 
 ```bash
@@ -331,7 +427,41 @@ HTTP/1.1 204 No Content
 
 ---
 
-### 7. Get JWKS (`/.well-known/jwks.json`)
+### 8. Logout (Cookie-based for Web)
+Revokes the session associated with the refresh token in cookie and clears the cookie.
+
+```bash
+curl -i -X POST http://localhost:4001/auth/logout/cookie \
+  -b cookies.txt \
+  -c cookies.txt
+```
+**Response (204 No Content):**
+```
+Set-Cookie: refresh_token=; Max-Age=0; Path=/auth; HttpOnly; SameSite=Lax
+HTTP/1.1 204 No Content
+```
+
+---
+
+### 9. Get Current User (`/auth/me`)
+Retrieves the authenticated user claims from the RS256 Bearer access token.
+
+```bash
+curl -i http://localhost:4001/auth/me \
+  -H "Authorization: Bearer <ACCESS_TOKEN>"
+```
+**Response (200 OK):**
+```json
+{
+  "userId": "67389a0123456789abcdef01",
+  "email": "developer@nebron.com",
+  "sessionId": "67389a0123456789abcdef02"
+}
+```
+
+---
+
+### 10. Get JWKS (`/.well-known/jwks.json`)
 Public JSON Web Key Set used by verifier microservices (`core-api`, `chat-service`, `voice-service`).
 
 ```bash
@@ -355,7 +485,7 @@ curl -i http://localhost:4001/.well-known/jwks.json
 
 ---
 
-### 8. Swagger UI Documentation
+### 11. Swagger UI Documentation
 Open `http://localhost:4001/docs` in your browser to interact with the OpenAPI 3.1 specification.
 
 ---
