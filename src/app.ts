@@ -51,7 +51,7 @@ export async function buildApp(deps: AppDependencies): Promise<FastifyInstance> 
   // Global Error Handler & 404
   registerErrorHandler(app);
 
-  // Cookie Support
+  // Cookie parsing
   await app.register(fastifyCookie);
 
   // Security Plugins (Helmet, CORS, Rate Limit)
@@ -76,7 +76,6 @@ export async function buildApp(deps: AppDependencies): Promise<FastifyInstance> 
     db,
     redisManager,
     redisClient,
-    config,
   });
 
   return app;
