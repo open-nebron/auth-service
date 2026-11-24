@@ -51,6 +51,19 @@ export async function buildApp(deps: AppDependencies): Promise<FastifyInstance> 
   // Global Error Handler & 404
   registerErrorHandler(app);
 
+  // Allow empty body with application/json (e.g. cookie refresh/logout calls)
+  app.addContentTypeParser('application/json', { parseAs: 'string' }, (_req, body: string, done) => {
+    if (!body || body.trim().length === 0) {
+      done(null, {});
+      return;
+    }
+    try {
+      done(null, JSON.parse(body));
+    } catch (err) {
+      done(err as Error, undefined);
+    }
+  });
+
   // Cookie parsing
   await app.register(fastifyCookie);
 
@@ -76,6 +89,7 @@ export async function buildApp(deps: AppDependencies): Promise<FastifyInstance> 
     db,
     redisManager,
     redisClient,
+    config,
   });
 
   return app;
