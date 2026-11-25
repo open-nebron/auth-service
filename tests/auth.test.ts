@@ -624,6 +624,88 @@ describe('Auth Service Integration Tests', () => {
     });
   });
 
+  describe('POST /internal/users/:userId/revoke-sessions', () => {
+    it('should reject request without valid internal token', async () => {
+      const res = await ctx.app.inject({
+        method: 'POST',
+        url: '/internal/users/60c72b2f9b1d8b2bad000001/revoke-sessions',
+      });
+      expect(res.statusCode).toBe(403);
+      const body = JSON.parse(res.body);
+      expect(body.error.code).toBe('FORBIDDEN');
+    });
+
+    it('should reject request with invalid internal token', async () => {
+      const res = await ctx.app.inject({
+        method: 'POST',
+        url: '/internal/users/60c72b2f9b1d8b2bad000001/revoke-sessions',
+        headers: { 'x-internal-token': 'wrong-token' },
+      });
+      expect(res.statusCode).toBe(403);
+    });
+
+    it('should revoke all active sessions for the user and publish event', async () => {
+      const reg = await ctx.app.inject({
+        method: 'POST',
+        url: '/auth/register',
+        payload: {
+          email: 'banneduser@example.com',
+          password: 'ValidPassword123!',
+        },
+      });
+      const userId = JSON.parse(reg.body).userId;
+
+      // Login twice to create 2 sessions
+      const l1 = await ctx.app.inject({
+        method: 'POST',
+        url: '/auth/login',
+        payload: {
+          email: 'banneduser@example.com',
+          password: 'ValidPassword123!',
+        },
+      });
+      const l2 = await ctx.app.inject({
+        method: 'POST',
+        url: '/auth/login',
+        payload: {
+          email: 'banneduser@example.com',
+          password: 'ValidPassword123!',
+        },
+      });
+
+      const rt1 = JSON.parse(l1.body).refreshToken;
+      const rt2 = JSON.parse(l2.body).refreshToken;
+
+      const res = await ctx.app.inject({
+        method: 'POST',
+        url: `/internal/users/${userId}/revoke-sessions`,
+        headers: { 'x-internal-token': 'test-internal-token' },
+      });
+
+      expect(res.statusCode).toBe(200);
+      const data = JSON.parse(res.body);
+      expect(data.success).toBe(true);
+      expect(data.revokedCount).toBe(2);
+
+      // Refresh attempts should now fail
+      const refRes = await ctx.app.inject({
+        method: 'POST',
+        url: '/auth/refresh',
+        payload: { refreshToken: rt1 },
+      });
+      expect(refRes.statusCode).toBe(401);
+      expect(JSON.parse(refRes.body).error.code).toBe('TOKEN_REVOKED');
+
+      // Verify event was published
+      const events = await ctx.redis.xrange('nebron.events', '-', '+');
+      const revokedEvent = events.find(([, fields]) => {
+        const arr = fields as string[];
+        return arr[1] === 'auth.session.revoked' && arr[3].includes(userId);
+      });
+      expect(revokedEvent).toBeDefined();
+    });
+  });
+
   describe('OpenAPI Swagger Docs', () => {
     it('should serve Swagger UI at /docs', async () => {
       const res = await ctx.app.inject({

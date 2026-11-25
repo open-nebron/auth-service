@@ -43,6 +43,7 @@ export async function createTestContext(): Promise<TestContext> {
     ACCESS_TOKEN_TTL_SECONDS: 900,
     REFRESH_TOKEN_TTL_DAYS: 30,
     ALLOWED_ORIGINS: 'http://localhost:3000,http://localhost:8081',
+    INTERNAL_TOKEN: 'test-internal-token',
     NODE_ENV: 'test',
     LOG_LEVEL: 'silent',
     COOKIE_DOMAIN: undefined,

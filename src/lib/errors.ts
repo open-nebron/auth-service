@@ -45,6 +45,12 @@ export class UnauthorizedError extends AppError {
   }
 }
 
+export class ForbiddenError extends AppError {
+  constructor(message: string = 'Forbidden') {
+    super(403, 'FORBIDDEN', message);
+  }
+}
+
 export class MissingRefreshTokenError extends AppError {
   constructor(message: string = 'Refresh token is required') {
     super(401, 'missing_refresh_token', message);

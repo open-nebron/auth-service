@@ -13,6 +13,7 @@ const envSchema = z.object({
   ACCESS_TOKEN_TTL_SECONDS: z.coerce.number().int().positive().default(900),
   REFRESH_TOKEN_TTL_DAYS: z.coerce.number().int().positive().default(30),
   ALLOWED_ORIGINS: z.string().default('http://localhost:3000,http://localhost:8081'),
+  INTERNAL_TOKEN: z.string().default('dev-internal-token-change-me'),
   NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
   LOG_LEVEL: z.string().default('info'),
   COOKIE_DOMAIN: z.string().optional(),

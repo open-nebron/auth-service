@@ -12,7 +12,7 @@ import {
   refreshSchema,
   logoutSchema,
 } from './schemas.js';
-import { ValidationError, UnauthorizedError, MissingRefreshTokenError, TokenRevokedError } from '../../lib/errors.js';
+import { ValidationError, UnauthorizedError, ForbiddenError, MissingRefreshTokenError, TokenRevokedError } from '../../lib/errors.js';
 
 export function registerAuthRoutes(
   app: FastifyInstance,
@@ -268,6 +268,24 @@ export function registerAuthRoutes(
         db: dbOk ? 'ok' : 'error',
         redis: redisOk ? 'ok' : 'error',
       });
+    }
+  );
+
+  // POST /internal/users/:userId/revoke-sessions
+  app.post(
+    '/internal/users/:userId/revoke-sessions',
+    async (request: FastifyRequest, reply: FastifyReply) => {
+      const tokenHeader =
+        (request.headers['x-internal-token'] as string) ||
+        (request.headers.authorization?.replace(/^Bearer\s+/i, '') as string);
+
+      if (!tokenHeader || tokenHeader !== config.INTERNAL_TOKEN) {
+        throw new ForbiddenError('Invalid or missing internal token');
+      }
+
+      const { userId } = request.params as { userId: string };
+      const count = await authService.revokeAllUserSessions(userId);
+      return reply.status(200).send({ success: true, revokedCount: count });
     }
   );
 }

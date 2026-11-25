@@ -262,6 +262,22 @@ export class AuthService {
     // Idempotent: always succeed
   }
 
+  async revokeAllUserSessions(userId: string, reason = 'admin_action'): Promise<number> {
+    const userObjId = ObjectId.isValid(userId) ? new ObjectId(userId) : null;
+    if (!userObjId) return 0;
+    const now = new Date();
+    const res = await this.db.sessions.updateMany(
+      { userId: userObjId, revokedAt: null },
+      { $set: { revokedAt: now } }
+    );
+    await this.publisher.publishSessionRevoked({
+      userId,
+      sessionId: 'all',
+      reason,
+    });
+    return res.modifiedCount;
+  }
+
   async me(accessToken: string): Promise<UserMeResponse> {
     const payload = await this.keyManager.verifyAccessToken(accessToken);
     return {
