@@ -12,9 +12,17 @@ export interface SessionRevokedPayload {
   reason: string;
 }
 
+export interface SessionRevokedDevicePayload {
+  userId: string;
+  sessionId: string;
+  reason: string;
+  at?: string | Date;
+}
+
 export interface EventPublisher {
   publishUserRegistered(data: UserRegisteredPayload): Promise<void>;
   publishSessionRevoked(data: SessionRevokedPayload): Promise<void>;
+  publishSessionRevokedDevice(data: SessionRevokedDevicePayload): Promise<void>;
 }
 
 export class RedisStreamsEventPublisher implements EventPublisher {
@@ -52,6 +60,23 @@ export class RedisStreamsEventPublisher implements EventPublisher {
       '*',
       'type',
       'auth.session.revoked',
+      'payload',
+      JSON.stringify(payload)
+    );
+  }
+
+  async publishSessionRevokedDevice(data: SessionRevokedDevicePayload): Promise<void> {
+    const payload = {
+      userId: data.userId,
+      sessionId: data.sessionId,
+      reason: data.reason,
+      at: (data.at instanceof Date ? data.at.toISOString() : data.at) || new Date().toISOString(),
+    };
+    await this.redis.xadd(
+      this.streamKey,
+      '*',
+      'type',
+      'auth.session.revoked_device',
       'payload',
       JSON.stringify(payload)
     );

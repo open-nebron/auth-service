@@ -242,6 +242,56 @@ export function registerAuthRoutes(
     }
   );
 
+  async function authenticateBearer(request: FastifyRequest): Promise<{ userId: string; sessionId: string }> {
+    const authHeader = request.headers.authorization;
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      throw new UnauthorizedError('Missing or invalid Authorization header');
+    }
+    const token = authHeader.slice(7).trim();
+    if (!token) {
+      throw new UnauthorizedError('Missing access token');
+    }
+    const payload = await keyManager.verifyAccessToken(token);
+    return {
+      userId: payload.sub,
+      sessionId: payload.sid,
+    };
+  }
+
+  // GET /auth/sessions
+  app.get(
+    '/auth/sessions',
+    async (request: FastifyRequest, reply: FastifyReply) => {
+      const { userId, sessionId } = await authenticateBearer(request);
+      const result = await authService.getSessions(userId, sessionId);
+      return reply.status(200).send(result);
+    }
+  );
+
+  // DELETE /auth/sessions/:sessionId
+  app.delete(
+    '/auth/sessions/:sessionId',
+    async (request: FastifyRequest, reply: FastifyReply) => {
+      const { userId, sessionId } = await authenticateBearer(request);
+      const { sessionId: targetSessionId } = request.params as { sessionId: string };
+      const { isCurrent } = await authService.revokeSession(userId, targetSessionId, sessionId);
+      if (isCurrent) {
+        reply.clearCookie('refresh_token', getClearCookieOptions());
+      }
+      return reply.status(204).send();
+    }
+  );
+
+  // DELETE /auth/sessions
+  app.delete(
+    '/auth/sessions',
+    async (request: FastifyRequest, reply: FastifyReply) => {
+      const { userId, sessionId } = await authenticateBearer(request);
+      const { revokedCount } = await authService.revokeOtherSessions(userId, sessionId);
+      return reply.header('X-Revoked-Count', String(revokedCount)).status(204).send();
+    }
+  );
+
   // GET /.well-known/jwks.json
   app.get(
     '/.well-known/jwks.json',

@@ -20,6 +20,7 @@ export interface SessionDocument {
   ip: string | null;
   expiresAt: Date;
   createdAt: Date;
+  lastActiveAt?: Date | null;
   revokedAt: Date | null;
 }
 

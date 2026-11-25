@@ -78,6 +78,7 @@ export async function buildApp(deps: AppDependencies): Promise<FastifyInstance> 
     db,
     keyManager,
     publisher,
+    redisClient,
     accessTokenTtlSeconds: config.ACCESS_TOKEN_TTL_SECONDS,
     refreshTokenTtlDays: config.REFRESH_TOKEN_TTL_DAYS,
   });
