@@ -164,7 +164,7 @@ export class KeyManager {
     })
       .setProtectedHeader({ alg: 'RS256', kid: this.activeKid })
       .setIssuer('nebron-auth')
-      .setAudience(['core', 'chat', 'voice'])
+      .setAudience(['core', 'chat', 'voice', 'spaces'])
       .setIssuedAt()
       .setExpirationTime(`${expiresInSeconds}s`)
       .sign(this.activePrivateKey);

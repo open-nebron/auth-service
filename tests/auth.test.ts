@@ -588,7 +588,7 @@ describe('Auth Service Integration Tests', () => {
 
       expect(verified.payload.email).toBe('jwkuser@example.com');
       expect(verified.payload.iss).toBe('nebron-auth');
-      expect(verified.payload.aud).toEqual(['core', 'chat', 'voice']);
+      expect(verified.payload.aud).toEqual(['core', 'chat', 'voice', 'spaces']);
     });
   });
 
