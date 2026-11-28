@@ -147,6 +147,17 @@ export class AuthService {
       createdAt: now,
     });
 
+    if (this.redisClient) {
+      try {
+        const nowMs = now.getTime();
+        await this.redisClient.zadd('live:signups_last_hour', nowMs, userIdStr);
+        await this.redisClient.zremrangebyscore('live:signups_last_hour', 0, nowMs - 3_600_000);
+        await this.redisClient.expire('live:signups_last_hour', 7200);
+      } catch {
+        // Best-effort live signup counter (approximate)
+      }
+    }
+
     capture(userIdStr, 'user_registered', { email: newUser.email });
 
     return { userId: userIdStr };
